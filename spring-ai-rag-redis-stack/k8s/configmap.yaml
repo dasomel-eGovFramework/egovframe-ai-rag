@@ -14,6 +14,11 @@ data:
   SPRING_AI_VECTORSTORE_REDIS_HOST: "redis-stack"
   SPRING_AI_VECTORSTORE_REDIS_PORT: "6379"
   SPRING_AI_VECTORSTORE_REDIS_INITIALIZE_SCHEMA: "false"
+  # spring.data.redis.* — 실제 Redis 연결에 사용되는 속성
+  SPRING_DATA_REDIS_HOST: "redis-stack"
+  SPRING_DATA_REDIS_PORT: "6379"
   SPRING_AI_DOCUMENT_PATH: "file:/workspace/data/**/*.md"
   SPRING_AI_DOCUMENT_PDF_PATH: "file:/workspace/data/**/*.pdf"
+  # Actuator health probe 활성화 (/readiness, /liveness)
+  MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
   MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info"

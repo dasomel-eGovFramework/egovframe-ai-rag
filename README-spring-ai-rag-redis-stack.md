@@ -432,3 +432,65 @@ java -Xmx4g -jar target/spring-ai-rag-redis-stack-1.0.0.jar
 - [Redis Stack 문서](https://redis.io/docs/stack/)
 - [Ollama 문서](https://github.com/ollama/ollama)
 - [ONNX Runtime 문서](https://onnxruntime.ai/)
+
+---
+
+## Docker / Kubernetes 배포
+
+### Docker 이미지 빌드
+
+프로젝트 루트에서 `spring-ai-rag-redis-stack` 디렉터리로 이동 후 빌드한다.
+
+```bash
+cd spring-ai-rag-redis-stack
+docker build -t <레지스트리>/spring-ai-rag-redis:1.0.0 .
+docker push <레지스트리>/spring-ai-rag-redis:1.0.0
+```
+
+> **참고**: 런타임 베이스 이미지는 `eclipse-temurin:17-jre-jammy`(Ubuntu, glibc)를 사용한다.
+> DJL의 `libtokenizers.so`가 glibc(`libstdc++.so.6`)를 요구하므로 Alpine(musl) 기반에서는 런타임 크래시가 발생한다.
+
+### Kubernetes 배포
+
+`spring-ai-rag-redis-stack/k8s/` 디렉터리에 매니페스트가 준비되어 있다.
+
+```bash
+# ConfigMap 적용
+kubectl apply -f k8s/configmap.yaml
+
+# Deployment · Service 적용
+kubectl apply -f k8s/deployment.yaml
+kubectl apply -f k8s/service.yaml
+```
+
+#### 환경변수 오버라이드 (ConfigMap)
+
+| 환경변수 | 대응 속성 | 기본값 | 설명 |
+| :------- | :------- | :----- | :--- |
+| `SPRING_AI_OLLAMA_BASE_URL` | `spring.ai.ollama.base-url` | `http://ollama:11434` | Ollama 서비스 주소 |
+| `SPRING_AI_VECTORSTORE_REDIS_HOST` | `spring.ai.vectorstore.redis.host` | `redis-stack` | Redis 벡터 저장소 호스트 |
+| `SPRING_AI_VECTORSTORE_REDIS_PORT` | `spring.ai.vectorstore.redis.port` | `6379` | Redis 벡터 저장소 포트 |
+| `SPRING_DATA_REDIS_HOST` | `spring.data.redis.host` | `redis-stack` | Redis 연결 호스트 |
+| `SPRING_DATA_REDIS_PORT` | `spring.data.redis.port` | `6379` | Redis 연결 포트 |
+| `SPRING_AI_DOCUMENT_PATH` | `spring.ai.document.path` | `file:/workspace/data/**/*.md` | 문서 경로 (글로브 패턴) |
+| `SPRING_AI_DOCUMENT_PDF_PATH` | `spring.ai.document.pdf-path` | `file:/workspace/data/**/*.pdf` | PDF 문서 경로 |
+| `MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED` | `management.endpoint.health.probes.enabled` | `true` | K8s readiness/liveness probe 활성화 |
+| `MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE` | `management.endpoints.web.exposure.include` | `health,info` | Actuator 노출 엔드포인트 |
+
+#### 리소스 요구사항
+
+ONNX 모델 로딩 시 메모리 사용량이 높으므로 Deployment에서 다음과 같이 설정되어 있다.
+
+| 항목 | 값 |
+| :--- | :--- |
+| `requests.memory` | `4Gi` |
+| `limits.memory` | `8Gi` |
+| `readinessProbe.initialDelaySeconds` | `60` (ONNX 로딩 소요 시간 고려) |
+
+### 상태 확인
+
+```bash
+kubectl get pods -l app.kubernetes.io/name=spring-ai-rag-redis
+kubectl logs -l app.kubernetes.io/name=spring-ai-rag-redis --tail=100
+```
+

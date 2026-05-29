@@ -18,10 +18,12 @@ RUN --mount=type=cache,target=/root/.m2 \
     cp target/*.jar /workspace/app.jar
 
 # ---------- Runtime ----------
-FROM eclipse-temurin:17-jre-alpine AS runtime
+# DJL libtokenizers.so 는 glibc(libstdc++.so.6) 를 요구하므로
+# musl 기반 Alpine 대신 glibc 기반 jammy 사용
+FROM eclipse-temurin:17-jre-jammy AS runtime
 
 # Run as a non-root user
-RUN addgroup -S app && adduser -S -G app app
+RUN groupadd --system app && useradd --system --gid app --no-create-home app
 USER app:app
 
 WORKDIR /app
@@ -33,6 +35,6 @@ ENV JAVA_OPTS="-XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError" \
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-  CMD wget -qO- http://127.0.0.1:8080/actuator/health || exit 1
+  CMD curl -sf http://127.0.0.1:8080/actuator/health || exit 1
 
 ENTRYPOINT ["sh","-c","exec java $JAVA_OPTS -jar /app/app.jar"]
