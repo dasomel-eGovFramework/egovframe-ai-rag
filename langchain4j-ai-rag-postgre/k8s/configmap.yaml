@@ -21,12 +21,12 @@ data:
   PGVECTOR_DATABASE: "ragdb"
   PGVECTOR_USERNAME: "postgres"
 
-  # LangChain4j Ollama (langchain4j.ollama.base-url, 대시 제거 env명)
-  LANGCHAIN4J_OLLAMA_BASEURL: "http://ollama:11434"
+  # LangChain4j Ollama (langchain4j.ollama.base-url → LANGCHAIN4J_OLLAMA_BASE_URL)
+  LANGCHAIN4J_OLLAMA_BASE_URL: "http://ollama:11434"
 
-  # 임베딩 설정 파일 경로 (app.embedding-config-path, 대시 제거 env명)
+  # 임베딩 설정 파일 경로 (app.embedding-config-path → APP_EMBEDDING_CONFIG_PATH)
   # 파드에 마운트된 PVC(/models) 내 사용자가 적재한 파일을 참조한다.
-  APP_EMBEDDINGCONFIGPATH: "/models/Config/embeddingConfig.json"
+  APP_EMBEDDING_CONFIG_PATH: "/models/Config/embeddingConfig.json"
 
   # Actuator health probe 활성화
   MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info"
