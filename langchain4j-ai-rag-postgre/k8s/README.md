@@ -57,13 +57,24 @@ kubectl cp <로컬-모델-디렉토리>/. model-loader:/models/
 kubectl delete pod model-loader
 ```
 
+PVC는 사용자 홈 디렉터리 내용을 `/models`에 마운트한다. 따라서 `application.yml` 기본값
+(`${user.home}/langchain4j-Config/Config/embeddingConfig.json`)과 동일한 하위 경로를 유지해야 한다.
+
 PVC 내 디렉토리 구조 예시:
 
 ```
 /models/
-└── Config/
-    └── embeddingConfig.json   ← APP_EMBEDDINGCONFIGPATH 참조 경로
+└── langchain4j-Config/
+    ├── Config/
+    │   └── embeddingConfig.json   ← APP_EMBEDDING_CONFIG_PATH 참조 경로
+    └── model/
+        ├── model.onnx             ← embeddingConfig.json의 modelPath
+        └── tokenizer.json         ← embeddingConfig.json의 tokenizerPath
 ```
+
+> `embeddingConfig.json`의 `modelPath`/`tokenizerPath`는 `${HOME}/langchain4j-Config/model/...` 형태이며,
+> `ConfigUtils.resolvePath`가 `${HOME}`을 HOME 환경변수로 치환한다. ConfigMap에 `HOME: /models`를 두어
+> 모델 파일이 PVC 마운트 경로 기준으로 해석되도록 한다.
 
 ---
 
@@ -90,11 +101,17 @@ image: <레지스트리>/langchain4j-ai-rag-postgre:1.0.0
 | `PGVECTOR_PORT` | `5432` | `pgvector.port` |
 | `PGVECTOR_DATABASE` | `ragdb` | `pgvector.database` |
 | `PGVECTOR_USERNAME` | `postgres` | `pgvector.username` |
-| `LANGCHAIN4J_OLLAMA_BASEURL` | `http://ollama:11434` | `langchain4j.ollama.base-url` |
-| `APP_EMBEDDINGCONFIGPATH` | `/models/Config/embeddingConfig.json` | `app.embedding-config-path` |
-| `MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED` | `true` | `management.endpoint.health.probes.enabled` |
+| `LANGCHAIN4J_OLLAMA_BASE_URL` | `http://ollama:11434` | `langchain4j.ollama.base-url` |
+| `APP_EMBEDDING_CONFIG_PATH` | `/models/langchain4j-Config/Config/embeddingConfig.json` | `app.embedding-config-path` |
+| `HOME` | `/models` | `embeddingConfig.json`의 `${HOME}` 치환 기준 경로 |
+| `MANAGEMENT_HEALTH_PROBES_ENABLED` | `true` | `management.health.probes.enabled` |
 
 > `SPRING_DATASOURCE_*`와 `PGVECTOR_*`는 각각 독립적인 연결 설정이며 둘 다 `postgres-pgvector`를 가리킨다.
+
+> **user.home 분리** — DJL은 네이티브 라이브러리를 `user.home/.djl.ai/`에 캐시한다.
+> `readOnlyRootFilesystem: true` 환경에서 쓰기 실패를 막기 위해 `deployment.yaml`의
+> `JAVA_TOOL_OPTIONS: -Duser.home=/tmp`로 JVM `user.home`을 쓰기 가능한 `/tmp`(emptyDir)로 지정한다.
+> `${HOME}` 치환용 `HOME`(=/models)과 DJL 캐시용 `user.home`(=/tmp)은 서로 다른 용도로 분리되어 있다.
 
 ### Secret — DB 인증 정보 생성
 
@@ -219,7 +236,7 @@ spec:
 | PostgreSQL 포트 | `5432` | |
 | DB 이름 | `ragdb` | |
 | Ollama 서비스 | `http://ollama:11434` | 클러스터 내 DNS 기본값 |
-| 임베딩 설정 파일 경로 | `/models/Config/embeddingConfig.json` | PVC 마운트 경로 |
+| 임베딩 설정 파일 경로 | `/models/langchain4j-Config/Config/embeddingConfig.json` | PVC 마운트 경로 |
 | 모델 PVC | `langchain4j-ai-rag-postgre-models` (5Gi) | 사전 적재 필요 |
 
 ---
