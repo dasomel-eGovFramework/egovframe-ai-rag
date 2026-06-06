@@ -17,6 +17,7 @@ import com.example.chat.config.EgovRagConfig;
 import com.example.chat.config.rag.transformers.EgovCompressionQueryTransformer;
 import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
 import com.example.chat.response.TechnologyResponse;
+import com.example.chat.service.EgovAiFallbackHandler;
 import com.example.chat.service.EgovSessionAwareChatService;
 import com.example.chat.util.EgovThinkTagOutputConverter;
 
@@ -33,6 +34,7 @@ public class EgovSessionAwareChatServiceImpl extends EgovAbstractServiceImpl imp
     private final MessageChatMemoryAdvisor messageChatMemoryAdvisor;
     private final EgovCompressionQueryTransformer compressionTransformer;
     private final VectorStoreDocumentRetriever vectorStoreDocumentRetriever;
+    private final EgovAiFallbackHandler fallbackHandler;
 
     @Value("${rag.enable-query-compression:true}")
     private boolean enableQueryCompression;
@@ -75,7 +77,8 @@ public class EgovSessionAwareChatServiceImpl extends EgovAbstractServiceImpl imp
 
         } catch (Exception e) {
             log.error("세션별 RAG 스트리밍 응답 생성 중 오류 발생 - 세션: {}", sessionId, e);
-            return Flux.error(e);
+            String fallbackMessage = fallbackHandler.getFallbackMessage(e);
+            return Flux.error(new IllegalStateException(fallbackMessage, e));
         }
     }
 
@@ -103,7 +106,8 @@ public class EgovSessionAwareChatServiceImpl extends EgovAbstractServiceImpl imp
 
         } catch (Exception e) {
             log.error("세션별 일반 스트리밍 응답 생성 중 오류 발생 - 세션: {}", sessionId, e);
-            return Flux.error(e);
+            String fallbackMessage = fallbackHandler.getFallbackMessage(e);
+            return Flux.error(new IllegalStateException(fallbackMessage, e));
         }
     }
 
