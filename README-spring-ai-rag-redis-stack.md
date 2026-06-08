@@ -433,13 +433,12 @@ java -Xmx4g -jar target/spring-ai-rag-redis-stack-1.0.0.jar
 - [Ollama 문서](https://github.com/ollama/ollama)
 - [ONNX Runtime 문서](https://onnxruntime.ai/)
 
----
-
 ## Docker / Kubernetes 배포
 
 ### Docker 이미지 빌드
 
 프로젝트 루트에서 `spring-ai-rag-redis-stack` 디렉터리로 이동 후 빌드한다.
+ONNX 임베딩 모델은 이미지에 포함되지 않으며, 런타임에 외부 경로 또는 PVC에서 로딩한다.
 
 ```bash
 cd spring-ai-rag-redis-stack
@@ -450,20 +449,67 @@ docker push <레지스트리>/spring-ai-rag-redis:1.0.0
 > **참고**: 런타임 베이스 이미지는 `eclipse-temurin:17-jre-jammy`(Ubuntu, glibc)를 사용한다.
 > DJL의 `libtokenizers.so`가 glibc(`libstdc++.so.6`)를 요구하므로 Alpine(musl) 기반에서는 런타임 크래시가 발생한다.
 
+---
+
 ### Kubernetes 배포
 
 `spring-ai-rag-redis-stack/k8s/` 디렉터리에 매니페스트가 준비되어 있다.
 
+#### 1. 임베딩 모델 PVC 준비
+
+ONNX 임베딩 모델(`model.onnx`, `tokenizer.json`)은 이미지에 포함되지 않는다.
+배포 전 아래 순서로 PVC를 생성하고 모델 파일을 적재한다.
+
+```bash
+# PVC 생성
+kubectl apply -f k8s/models-pvc.yaml
+
+# 임시 파드로 파일 복사 (minikube 예시)
+kubectl run model-loader --image=busybox --restart=Never \
+  --overrides='{"spec":{"volumes":[{"name":"m","persistentVolumeClaim":{"claimName":"spring-ai-rag-redis-models"}}],"containers":[{"name":"c","image":"busybox","command":["sleep","3600"],"volumeMounts":[{"name":"m","mountPath":"/models"}]}]}}'
+
+kubectl cp <로컬-모델-디렉토리>/. model-loader:/models/
+kubectl delete pod model-loader
+```
+
+PVC 내 디렉터리 구조는 `application.yml` 기본 경로(`${user.home}/spring-ai-Config/model/...`)의 하위 구조를 유지해야 한다.
+
+```
+/models/
+└── spring-ai-Config/
+    └── model/
+        ├── model.onnx        ← EMBEDDING_MODEL_PATH 참조 경로
+        └── tokenizer.json    ← EMBEDDING_TOKENIZER_PATH 참조 경로
+```
+
+> ConfigMap의 `EMBEDDING_MODEL_PATH`/`EMBEDDING_TOKENIZER_PATH` 환경변수가
+> PVC 마운트 경로(`/models/spring-ai-Config/model/...`)를 가리키도록 설정되어 있다.
+
+#### 2. 매니페스트 적용
+
 ```bash
 # ConfigMap 적용
 kubectl apply -f k8s/configmap.yaml
+
+# PVC 적용 (모델 적재 포함 — 위 1번 참고)
+kubectl apply -f k8s/models-pvc.yaml
 
 # Deployment · Service 적용
 kubectl apply -f k8s/deployment.yaml
 kubectl apply -f k8s/service.yaml
 ```
 
-#### 환경변수 오버라이드 (ConfigMap)
+#### 3. 매니페스트 수정
+
+##### deployment.yaml — 이미지 경로 교체
+
+`k8s/deployment.yaml`의 `image` 필드를 push한 이미지 경로로 변경한다.
+
+```yaml
+image: <레지스트리>/spring-ai-rag-redis:1.0.0
+```
+
+##### configmap.yaml — 환경변수 목록
 
 | 환경변수 | 대응 속성 | 기본값 | 설명 |
 | :------- | :------- | :----- | :--- |
@@ -474,23 +520,108 @@ kubectl apply -f k8s/service.yaml
 | `SPRING_DATA_REDIS_PORT` | `spring.data.redis.port` | `6379` | Redis 연결 포트 |
 | `SPRING_AI_DOCUMENT_PATH` | `spring.ai.document.path` | `file:/workspace/data/**/*.md` | 문서 경로 (글로브 패턴) |
 | `SPRING_AI_DOCUMENT_PDF_PATH` | `spring.ai.document.pdf-path` | `file:/workspace/data/**/*.pdf` | PDF 문서 경로 |
-| `MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED` | `management.endpoint.health.probes.enabled` | `true` | K8s readiness/liveness probe 활성화 |
+| `EMBEDDING_MODEL_PATH` | `spring.ai.embedding.transformer.onnx.modelUri` 내 치환 | `/models/spring-ai-Config/model/model.onnx` | ONNX 모델 경로 (PVC) |
+| `EMBEDDING_TOKENIZER_PATH` | `spring.ai.embedding.transformer.tokenizer.uri` 내 치환 | `/models/spring-ai-Config/model/tokenizer.json` | 토크나이저 경로 (PVC) |
+| `MANAGEMENT_HEALTH_PROBES_ENABLED` | `management.health.probes.enabled` | `true` | K8s readiness/liveness probe 활성화 |
 | `MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE` | `management.endpoints.web.exposure.include` | `health,info` | Actuator 노출 엔드포인트 |
+
+> **user.home 분리** — DJL은 네이티브 라이브러리를 `user.home/.djl.ai/`에 캐시한다.
+> `readOnlyRootFilesystem: true` 환경에서 쓰기 실패를 막기 위해 `deployment.yaml`의
+> `JAVA_TOOL_OPTIONS: -Duser.home=/tmp`로 JVM `user.home`을 쓰기 가능한 `/tmp`(emptyDir)로 지정한다.
+> `EMBEDDING_MODEL_PATH`/`EMBEDDING_TOKENIZER_PATH`로 모델 경로를 명시적으로 지정하므로
+> `user.home` 변경이 모델 로딩에 영향을 주지 않는다.
 
 #### 리소스 요구사항
 
-ONNX 모델 로딩 시 메모리 사용량이 높으므로 Deployment에서 다음과 같이 설정되어 있다.
+ONNX 모델을 외부 PVC에서 로딩하므로 이미지 자체는 가볍다.
+런타임에 ONNX 모델 로딩 시 약 1–2GB 메모리가 필요하며,
+JVM 힙 + 네이티브 메모리 + DJL 토크나이저 버퍼 여유를 고려하여 `limits.memory`를 4Gi로 설정하였다.
 
-| 항목 | 값 |
-| :--- | :--- |
-| `requests.memory` | `4Gi` |
-| `limits.memory` | `8Gi` |
-| `readinessProbe.initialDelaySeconds` | `60` (ONNX 로딩 소요 시간 고려) |
+| 항목 | 값 | 비고 |
+| :--- | :--- | :--- |
+| `requests.cpu` | `500m` | |
+| `limits.cpu` | `2000m` | |
+| `requests.memory` | `2Gi` | |
+| `limits.memory` | `4Gi` | 모델 외부화로 8Gi → 4Gi로 축소 |
+| `readinessProbe.initialDelaySeconds` | `60` | ONNX 모델 로딩 소요 시간 고려 |
+| 모델 PVC | `spring-ai-rag-redis-models` (5Gi) | 사전 적재 필요 |
+
+> 모델이 대형(1GB 이상)이거나 동시 요청이 많은 경우 `limits.memory`를 6–8Gi로 상향 조정할 수 있다.
 
 ### 상태 확인
 
 ```bash
+# 파드 상태 확인
 kubectl get pods -l app.kubernetes.io/name=spring-ai-rag-redis
+
+# 파드 로그 확인
 kubectl logs -l app.kubernetes.io/name=spring-ai-rag-redis --tail=100
+
+# Deployment 롤아웃 상태
+kubectl rollout status deployment/spring-ai-rag-redis
+
+# Actuator health 확인 (파드 내부에서)
+kubectl exec -it <pod-name> -- wget -qO- http://127.0.0.1:8080/actuator/health
 ```
+
+### 접속
+
+Service 타입이 `ClusterIP`이므로 클러스터 외부에서 직접 접근할 수 없다. 아래 방법 중 하나를 선택한다.
+
+#### 방법 A: kubectl port-forward (개발·디버그용)
+
+```bash
+kubectl port-forward svc/spring-ai-rag-redis 8080:8080
+# 이후 http://localhost:8080 으로 접속
+```
+
+#### 방법 B: NodePort로 Service 타입 변경 (테스트 환경)
+
+`k8s/service.yaml`에서 `type: ClusterIP`를 `type: NodePort`로 변경하고 재적용한다.
+
+```yaml
+spec:
+  type: NodePort
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      nodePort: 30080   # 30000–32767 범위
+```
+
+```bash
+kubectl apply -f k8s/service.yaml
+# 접속: http://<NodeIP>:30080
+```
+
+### 업데이트 배포 (롤링 업데이트)
+
+새 이미지를 빌드·push한 후 이미지 태그를 갱신하여 재적용한다.
+
+```bash
+docker build -t <레지스트리>/spring-ai-rag-redis:1.0.1 .
+docker push <레지스트리>/spring-ai-rag-redis:1.0.1
+
+# deployment.yaml의 image 태그 수정 후
+kubectl apply -f k8s/deployment.yaml
+
+# 롤아웃 진행 상황 확인
+kubectl rollout status deployment/spring-ai-rag-redis
+```
+
+롤백이 필요한 경우:
+
+```bash
+kubectl rollout undo deployment/spring-ai-rag-redis
+```
+
+### 리소스 정리
+
+```bash
+kubectl delete -f k8s/service.yaml
+kubectl delete -f k8s/deployment.yaml
+kubectl delete -f k8s/configmap.yaml
+kubectl delete -f k8s/models-pvc.yaml
+```
+
 
