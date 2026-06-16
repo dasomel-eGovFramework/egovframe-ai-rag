@@ -5,27 +5,29 @@ import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.ollama.OllamaChatModel;
 import dev.langchain4j.model.ollama.OllamaStreamingChatModel;
 import dev.langchain4j.store.embedding.EmbeddingStore;
+import com.example.chat.config.EgovLangChain4jConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
+import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Bean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SpringBootTest
 class Langchain4jRagApplicationTests {
 
-    @MockBean
+    @MockitoBean
     private EmbeddingModel embeddingModel;
 
-    @MockBean
+    @MockitoBean
     private OllamaChatModel chatLanguageModel;
 
-    @MockBean
+    @MockitoBean
     private OllamaStreamingChatModel streamingChatLanguageModel;
 
-    @MockBean
+    @MockitoBean
     private EmbeddingStore<TextSegment> embeddingStore;
 
     @Test
@@ -36,11 +38,10 @@ class Langchain4jRagApplicationTests {
     static class TestConfig {
         @Bean
         public static BeanFactoryPostProcessor removeRealConfig() {
-            return beanFactory -> {
-                if (beanFactory instanceof BeanDefinitionRegistry) {
-                    BeanDefinitionRegistry registry = (BeanDefinitionRegistry) beanFactory;
-                    if (registry.containsBeanDefinition("egovLangChain4jConfig")) {
-                        registry.removeBeanDefinition("egovLangChain4jConfig");
+            return (ConfigurableListableBeanFactory beanFactory) -> {
+                if (beanFactory instanceof BeanDefinitionRegistry registry) {
+                    for (String name : beanFactory.getBeanNamesForType(EgovLangChain4jConfig.class, false, false)) {
+                        registry.removeBeanDefinition(name);
                     }
                 }
             };
