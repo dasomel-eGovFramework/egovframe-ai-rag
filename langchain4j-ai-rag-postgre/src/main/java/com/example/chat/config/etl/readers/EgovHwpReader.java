@@ -25,13 +25,18 @@ import java.util.List;
 @Component
 public class EgovHwpReader {
 
-    @Value("${document.hwp-path}")
+    @Value("${document.hwp-path:#{null}}")
     private String hwpDocumentPath;
 
     /**
      * HWP 문서 로드
      */
     public List<Document> read() {
+        if (hwpDocumentPath == null || hwpDocumentPath.isBlank()) {
+            log.info("HWP 문서 경로가 설정되지 않아 건너뜁니다.");
+            return List.of();
+        }
+
         log.info("HWP 문서 읽기 시작 - 경로: {}", hwpDocumentPath);
 
         try {
