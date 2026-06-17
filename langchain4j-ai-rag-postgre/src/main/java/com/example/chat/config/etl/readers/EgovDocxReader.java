@@ -23,13 +23,17 @@ import java.util.List;
 @Component
 public class EgovDocxReader {
 
-    @Value("${document.docx-path}")
+    @Value("${document.docx-path:#{null}}")
     private String docxDocumentPath;
 
     /**
      * DOCX 문서 로드
      */
     public List<Document> read() {
+        if (docxDocumentPath == null || docxDocumentPath.isBlank()) {
+            log.info("DOCX 문서 경로가 설정되지 않아 건너뜁니다.");
+            return List.of();
+        }
         log.info("DOCX 문서 읽기 시작 - 경로: {}", docxDocumentPath);
 
         try {

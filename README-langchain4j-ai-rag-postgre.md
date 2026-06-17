@@ -175,8 +175,9 @@ Flux<String> 스트리밍 응답
 
 ## 문서 인덱싱
 
-- 현재 인덱싱 가능한 문서의 종류는 마크다운 파일과 PDF 파일로 구성되어 있다.
+- 현재 인덱싱 가능한 문서의 종류는 마크다운 파일, PDF 파일, DOCX 파일로 구성되어 있다.
 - `application.yml`의 문서 경로 관련 속성에서 확인 가능하다.
+- DOCX 업로드는 현재 UI에서 지원하지 않으며, `document.docx-path`에 지정한 경로에 파일을 직접 배치한 뒤 재인덱싱한다.
 
 ## 실행
 
@@ -236,7 +237,8 @@ langchain4j-ai-rag-postgre/
 │   │   └── etl/                     # 문서 ETL 파이프라인
 │   │       ├── readers/
 │   │       │   ├── EgovMarkdownReader.java   # 마크다운 문서 리더
-│   │       │   └── EgovPdfReader.java       # PDF 문서 리더
+│   │       │   ├── EgovPdfReader.java        # PDF 문서 리더
+│   │       │   └── EgovDocxReader.java       # DOCX 문서 리더
 │   │       ├── transformers/
 │   │       │   ├── EgovContentFormatTransformer.java   # 콘텐츠 포맷 변환
 │   │       │   └── EgovEnhancedDocumentTransformer.java # 문서 변환
