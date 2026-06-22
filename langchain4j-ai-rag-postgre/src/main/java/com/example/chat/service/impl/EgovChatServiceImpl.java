@@ -44,11 +44,15 @@ public class EgovChatServiceImpl extends EgovAbstractServiceImpl implements Egov
             RagChatbot ragChatbot = chatbotFactory.createRagChatbot(model, sessionId);
             return ragChatbot.streamChat(query)
                     .doOnComplete(() -> log.info("RAG 스트리밍 완료 - 세션: {}", sessionId))
-                    .doOnError(e -> log.error("RAG 스트리밍 오류 - 세션: {}", sessionId, e));
+                    .doOnError(e -> log.error("RAG 스트리밍 오류 - 세션: {}", sessionId, e))
+                    .onErrorResume(e -> {
+                        log.warn("RAG 스트리밍 폴백 반환 - 세션: {}", sessionId);
+                        return Flux.just(fallbackHandler.getFallbackMessage((Exception) e));
+                    });
 
         } catch (Exception e) {
             log.error("RAG 스트리밍 응답 생성 중 오류 - 세션: {}", sessionId, e);
-            return Flux.error(e);
+            return Flux.just(fallbackHandler.getFallbackMessage(e));
         }
     }
 
@@ -68,45 +72,15 @@ public class EgovChatServiceImpl extends EgovAbstractServiceImpl implements Egov
             SimpleChatbot simpleChatbot = chatbotFactory.createSimpleChatbot(model, sessionId);
             return simpleChatbot.streamChat(query)
                     .doOnComplete(() -> log.info("Simple 스트리밍 완료 - 세션: {}", sessionId))
-                    .doOnError(e -> log.error("Simple 스트리밍 오류 - 세션: {}", sessionId, e));
+                    .doOnError(e -> log.error("Simple 스트리밍 오류 - 세션: {}", sessionId, e))
+                    .onErrorResume(e -> {
+                        log.warn("Simple 스트리밍 폴백 반환 - 세션: {}", sessionId);
+                        return Flux.just(fallbackHandler.getFallbackMessage((Exception) e));
+                    });
 
         } catch (Exception e) {
             log.error("Simple 스트리밍 응답 생성 중 오류 - 세션: {}", sessionId, e);
-            return Flux.error(e);
-        }
-    }
-
-    /**
-     * RAG 응답 생성 (비스트리밍)
-     */
-    public String generateRagResponse(String query) {
-        String sessionId = SessionContext.getCurrentSessionId();
-        log.info("RAG 응답 생성 (비스트리밍) - 세션: {}, 쿼리: {}", sessionId, query);
-
-        try {
-            RagChatbot ragChatbot = chatbotFactory.createRagChatbot(null, sessionId);
-            return ragChatbot.chat(query);
-
-        } catch (Exception e) {
-            log.error("RAG 응답 생성 중 오류", e);
-            return handleException(e);
-        }
-    }
-
-    /**
-     * 일반 응답 생성 (비스트리밍)
-     */
-    public String generateSimpleResponse(String query) {
-        String sessionId = SessionContext.getCurrentSessionId();
-        log.info("Simple 응답 생성 (비스트리밍) - 세션: {}, 쿼리: {}", sessionId, query);
-
-        try {
-            SimpleChatbot simpleChatbot = chatbotFactory.createSimpleChatbot(null, sessionId);
-            return simpleChatbot.chat(query);
-
-        } catch (Exception e) {
-            log.error("Simple 응답 생성 중 오류", e);
-            return handleException(e);
+            return Flux.just(fallbackHandler.getFallbackMessage(e));
         }
     }
 
@@ -119,10 +93,4 @@ public class EgovChatServiceImpl extends EgovAbstractServiceImpl implements Egov
         }
     }
 
-    /**
-     * 예외 처리 — {@link EgovAiFallbackHandler}에 위임
-     */
-    private String handleException(Exception e) {
-        return fallbackHandler.getFallbackMessage(e);
-    }
 }
