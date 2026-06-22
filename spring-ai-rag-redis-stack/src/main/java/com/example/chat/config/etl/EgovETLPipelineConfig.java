@@ -5,6 +5,7 @@ import org.springframework.ai.vectorstore.redis.RedisVectorStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import com.example.chat.config.etl.readers.EgovHwpReader;
 import com.example.chat.config.etl.readers.EgovHwpxReader;
 import com.example.chat.config.etl.readers.EgovMarkdownReader;
 import com.example.chat.config.etl.readers.EgovPdfReader;
@@ -31,6 +32,12 @@ public class EgovETLPipelineConfig {
     }
 
     @Bean
+    public EgovHwpReader hwpReader() {
+        log.info("EgovHwpReader 빈 생성");
+        return new EgovHwpReader();
+    }
+
+    @Bean
     public EgovHwpxReader hwpxReader() {
         log.info("EgovHwpxReader 빈 생성");
         return new EgovHwpxReader();
@@ -53,4 +60,4 @@ public class EgovETLPipelineConfig {
         log.info("VectorStore DocumentWriter 빈 생성");
         return new EgovVectorStoreWriter(redisVectorStore);
     }
-} 
+}
