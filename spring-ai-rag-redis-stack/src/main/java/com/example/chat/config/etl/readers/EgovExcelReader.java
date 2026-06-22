@@ -29,11 +29,15 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 public class EgovExcelReader implements DocumentReader {
 
-    @Value("${spring.ai.document.xlsx-path}")
+    @Value("${spring.ai.document.xlsx-path:#{null}}")
     private String xlsxDocumentPath;
 
     @Override
     public List<Document> get() {
+        if (xlsxDocumentPath == null || xlsxDocumentPath.isBlank()) {
+            log.info("Excel 문서 경로가 설정되지 않아 건너뜁니다.");
+            return List.of();
+        }
         log.info("Excel 문서 읽기 시작 - 경로: {}", xlsxDocumentPath);
 
         try {
