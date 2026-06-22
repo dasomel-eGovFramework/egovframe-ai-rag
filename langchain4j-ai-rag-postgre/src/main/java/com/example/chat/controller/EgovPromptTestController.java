@@ -96,7 +96,7 @@ public class EgovPromptTestController {
             context = "LangChain4j는 Java 애플리케이션에서 LLM을 쉽게 사용할 수 있도록 돕는 라이브러리입니다. RAG(Retrieval-Augmented Generation), 채팅 메모리, 도구 사용 등의 기능을 제공합니다.";
         }
 
-        String systemPrompt = PromptEngineeringUtil.createFewShotLearningPrompt(context);
+        String systemPrompt = promptTemplateManager.render("few-shot-learning", Map.of("context", context));
         String fullPrompt = systemPrompt + "\n\nQuestion: " + query;
 
         OllamaChatModel chatModel = createChatModel();

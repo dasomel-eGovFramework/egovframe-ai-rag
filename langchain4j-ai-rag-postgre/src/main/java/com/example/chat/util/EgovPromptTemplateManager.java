@@ -26,7 +26,8 @@ import java.util.Map;
 public class EgovPromptTemplateManager {
 
     private static final String TEMPLATE_PATH = "classpath:prompts/prompt-templates.yml";
-    private static final String ROOT_KEY = "prompts";
+    private static final String ROOT_KEY = "egov";
+    private static final String TEMPLATES_KEY = "prompt-templates";
 
     private final ResourceLoader resourceLoader;
     private Map<String, String> templates = Collections.emptyMap();
@@ -69,11 +70,11 @@ public class EgovPromptTemplateManager {
      */
     public String render(String key, Map<String, String> variables) {
         String template = get(key);
-        if (template.isEmpty()) {
+        if (template.isEmpty() || variables == null || variables.isEmpty()) {
             return template;
         }
         for (Map.Entry<String, String> entry : variables.entrySet()) {
-            template = template.replace("{" + entry.getKey() + "}", entry.getValue());
+            template = template.replace("{" + entry.getKey() + "}", entry.getValue() != null ? entry.getValue() : "");
         }
         return template;
     }
@@ -93,13 +94,19 @@ public class EgovPromptTemplateManager {
                 return Collections.emptyMap();
             }
 
-            Object promptsNode = root.get(ROOT_KEY);
-            if (!(promptsNode instanceof Map)) {
-                log.warn("prompts 노드가 맵 형식이 아닙니다");
+            Object egovNode = root.get(ROOT_KEY);
+            if (!(egovNode instanceof Map)) {
+                log.warn("egov 노드가 맵 형식이 아닙니다");
                 return Collections.emptyMap();
             }
 
-            Map<String, Object> promptsMap = (Map<String, Object>) promptsNode;
+            Object templatesNode = ((Map<?, ?>) egovNode).get(TEMPLATES_KEY);
+            if (!(templatesNode instanceof Map)) {
+                log.warn("egov.prompt-templates 노드가 맵 형식이 아닙니다");
+                return Collections.emptyMap();
+            }
+
+            Map<String, Object> promptsMap = (Map<String, Object>) templatesNode;
             Map<String, String> result = new HashMap<>();
             for (Map.Entry<String, Object> entry : promptsMap.entrySet()) {
                 if (entry.getValue() != null) {
