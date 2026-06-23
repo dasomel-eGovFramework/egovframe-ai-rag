@@ -1,5 +1,6 @@
 package com.example.chat.service.impl;
 
+import java.lang.reflect.Constructor;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
@@ -11,13 +12,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
-
-import com.example.chat.config.etl.readers.EgovMarkdownReader;
-import com.example.chat.config.etl.readers.EgovPdfReader;
-import com.example.chat.config.etl.transformers.EgovContentFormatTransformer;
-import com.example.chat.config.etl.transformers.EgovEnhancedDocumentTransformer;
-import com.example.chat.config.etl.writers.EgovVectorStoreWriter;
-import com.example.chat.repository.DocumentHashRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -36,23 +30,25 @@ import static org.mockito.Mockito.mock;
  */
 class EgovDocumentServiceLoadGuardTest {
 
-    private EgovDocumentServiceImpl newService() {
-        Executor noopExecutor = command -> { /* 실행하지 않음 */ };
-        EgovDocumentServiceImpl service = new EgovDocumentServiceImpl(
-                mock(EgovMarkdownReader.class),
-                mock(EgovPdfReader.class),
-                mock(EgovContentFormatTransformer.class),
-                mock(EgovEnhancedDocumentTransformer.class),
-                mock(EgovVectorStoreWriter.class),
-                mock(DocumentHashRepository.class),
-                noopExecutor);
+    // 생성자 파라미터를 위치로 나열하지 않고 실제 생성자에서 읽어 채운다.
+    // @RequiredArgsConstructor에 리더가 추가돼도(예: HWP/HWPX/DOCX) 영향을 받지 않는다.
+    // Executor 인자만 비동기 본문을 실행하지 않는 noop으로 주입하고 나머지는 mock으로 채운다.
+    private EgovDocumentServiceImpl newService() throws Exception {
+        Constructor<?> ctor = EgovDocumentServiceImpl.class.getDeclaredConstructors()[0];
+        Class<?>[] types = ctor.getParameterTypes();
+        Object[] args = new Object[types.length];
+        for (int i = 0; i < types.length; i++) {
+            args[i] = types[i].equals(Executor.class) ? (Executor) command -> { /* 실행하지 않음 */ } : mock(types[i]);
+        }
+        ctor.setAccessible(true);
+        EgovDocumentServiceImpl service = (EgovDocumentServiceImpl) ctor.newInstance(args);
         ReflectionTestUtils.setField(service, "documentPath", "classpath:/docs");
         return service;
     }
 
     @Test
     @DisplayName("다수 스레드가 동시 호출해도 처리 진입은 한 번만 허용된다")
-    void onlyOneThreadAcquiresProcessing() throws InterruptedException {
+    void onlyOneThreadAcquiresProcessing() throws Exception {
         EgovDocumentServiceImpl service = newService();
 
         int threads = 16;
@@ -93,7 +89,7 @@ class EgovDocumentServiceLoadGuardTest {
 
     @Test
     @DisplayName("이미 처리 중이면 호출은 즉시 완료된 0 Future 를 반환한다")
-    void secondCallIsRejectedWhileProcessing() {
+    void secondCallIsRejectedWhileProcessing() throws Exception {
         EgovDocumentServiceImpl service = newService();
 
         CompletableFuture<Integer> first = service.loadDocumentsAsync();
