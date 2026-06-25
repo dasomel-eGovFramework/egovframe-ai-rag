@@ -81,13 +81,13 @@ public class EgovDocumentServiceImpl extends EgovAbstractServiceImpl implements 
 
     @Override
     public CompletableFuture<Integer> loadDocumentsAsync() {
-        if (isProcessing.get()) {
+        // 검사·설정을 단일 원자 연산으로 처리하여 동시 진입(TOCTOU)을 차단한다.
+        if (!isProcessing.compareAndSet(false, true)) {
             log.warn("이미 문서 처리가 진행 중입니다.");
             return CompletableFuture.completedFuture(0);
         }
 
         log.info("LangChain4j ETL 파이프라인으로 문서 처리 시작");
-        isProcessing.set(true);
         processedCount.set(0);
         totalCount.set(0);
         changedCount.set(0);
