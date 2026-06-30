@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Configuration;
 
 import com.example.chat.config.etl.readers.EgovDocxReader;
 import com.example.chat.config.etl.readers.EgovHwpReader;
+import com.example.chat.config.etl.readers.EgovHwpxReader;
 import com.example.chat.config.etl.readers.EgovMarkdownReader;
 import com.example.chat.config.etl.readers.EgovPdfReader;
 import com.example.chat.config.etl.transformers.EgovEnhancedDocumentTransformer;
@@ -44,6 +45,12 @@ public class EgovETLPipelineConfig {
     }
 
     @Bean
+    public EgovHwpxReader hwpxReader() {
+        log.info("EgovHwpxReader 빈 생성");
+        return new EgovHwpxReader();
+    }
+
+    @Bean
     public EgovContentFormatTransformer egovContentFormatTransformer() {
         log.info("EgovContentFormatTransformer 빈 생성");
         return new EgovContentFormatTransformer();
@@ -60,4 +67,4 @@ public class EgovETLPipelineConfig {
         log.info("VectorStore DocumentWriter 빈 생성");
         return new EgovVectorStoreWriter(redisVectorStore);
     }
-} 
+}
