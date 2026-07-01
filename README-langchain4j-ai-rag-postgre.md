@@ -175,12 +175,13 @@ Flux<String> 스트리밍 응답
 
 ## 문서 인덱싱
 
-- 현재 인덱싱 가능한 문서의 종류는 마크다운(`.md`), PDF(`.pdf`), HWP(`.hwp`), HWPX(`.hwpx`) 파일이다.
-- `application.yml`의 문서 경로 관련 속성(`document.path`, `document.pdf-path`, `document.hwp-path`, `document.hwpx-path`)에서 경로를 지정한다.
-- HWP/HWPX 인덱싱은 경로 기반으로만 지원된다. 각 경로 속성이 설정되지 않은 경우 해당 처리는 건너뛰며 앱 기동에는 영향이 없다.
+- 현재 인덱싱 가능한 문서의 종류는 마크다운(`.md`), PDF(`.pdf`), DOCX(`.docx`), HWP(`.hwp`), HWPX(`.hwpx`) 파일이다.
+- `application.yml`의 문서 경로 관련 속성(`document.path`, `document.pdf-path`, `document.docx-path`, `document.hwp-path`, `document.hwpx-path`)에서 경로를 지정한다.
+- DOCX/HWP/HWPX 인덱싱은 경로 기반으로만 지원된다. 각 경로 속성이 설정되지 않은 경우 해당 처리는 건너뛰며 앱 기동에는 영향이 없다.
+  - DOCX 활성화 예시: `document.docx-path: file:C:/workspace-test/upload/data/**/*.docx`
   - HWP 활성화 예시: `document.hwp-path: file:C:/workspace-test/upload/data/**/*.hwp`
   - HWPX 활성화 예시: `document.hwpx-path: file:C:/workspace-test/upload/data/**/*.hwpx`
-- 파일 업로드(웹 UI)는 마크다운(.md) 파일만 지원한다. PDF, HWP, HWPX는 서버 측 경로에 파일을 직접 배치한 뒤 재인덱싱으로 처리한다.
+- 파일 업로드(웹 UI)는 마크다운(.md) 파일만 지원한다. PDF, DOCX, HWP, HWPX는 서버 측 경로에 파일을 직접 배치한 뒤 재인덱싱으로 처리한다.
 - 알려진 제약: HWPX 파일에서 글머리기호·번호 매기기 단락의 텍스트는 추출에서 제외된다(hwpxlib insertParaHead=false 설정으로 NPE 회피).
 
 ## 실행
@@ -242,6 +243,7 @@ langchain4j-ai-rag-postgre/
 │   │       ├── readers/
 │   │       │   ├── EgovMarkdownReader.java   # 마크다운 문서 리더
 │   │       │   ├── EgovPdfReader.java        # PDF 문서 리더
+│   │       │   ├── EgovDocxReader.java       # DOCX 문서 리더
 │   │       │   ├── EgovHwpReader.java        # HWP 문서 리더
 │   │       │   └── EgovHwpxReader.java       # HWPX 문서 리더
 │   │       ├── transformers/
